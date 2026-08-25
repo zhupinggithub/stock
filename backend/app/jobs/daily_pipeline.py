@@ -1,6 +1,7 @@
 """One command for collection, verification, prediction and MySQL synchronization."""
 from __future__ import annotations
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -10,7 +11,9 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def run(*args: str) -> None:
     command = [str(ROOT / args[0]), *args[1:]]
-    subprocess.run([sys.executable, *command], check=True, cwd=ROOT)
+    options={"check":True,"cwd":ROOT}
+    if os.name=="nt": options["creationflags"]=subprocess.CREATE_NO_WINDOW
+    subprocess.run([sys.executable, *command], **options)
 
 def main() -> None:
     p=argparse.ArgumentParser(description="A股每日采集、验证、预测流水线")

@@ -11,7 +11,7 @@ def runs(): return fetch_all("""SELECT vr.id,pr.base_date,vr.actual_trade_date,v
 @router.get("/{run_id}")
 def detail(run_id:int):
     groups=fetch_all("SELECT * FROM verification_group_result WHERE verification_run_id=:id ORDER BY top_n",{"id":run_id})
-    values=fetch_all("""SELECT pc.ranking,sm.stock_code,sm.stock_name,pc.score,vd.base_close,vd.actual_close,
+    values=fetch_all("""SELECT pc.ranking,sm.stock_code,sm.stock_name,sm.market,pc.score,vd.base_close,vd.actual_close,
       vd.actual_return,vd.market_excess,vd.is_up,vd.verified FROM verification_detail vd
       JOIN prediction_candidate pc ON pc.id=vd.candidate_id JOIN stock_master sm ON sm.id=pc.stock_id
       WHERE vd.verification_run_id=:id ORDER BY pc.ranking""",{"id":run_id})

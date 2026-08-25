@@ -142,3 +142,20 @@ CREATE TABLE IF NOT EXISTS system_job (
   KEY idx_job_status_created (status,created_at),
   KEY idx_job_type_created (job_type,created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS task_schedule (
+  id TINYINT UNSIGNED NOT NULL,
+  enabled TINYINT(1) NOT NULL DEFAULT 0,
+  run_time TIME NOT NULL DEFAULT '15:20:00',
+  weekdays VARCHAR(20) NOT NULL DEFAULT '1,2,3,4,5',
+  data_dir VARCHAR(255) NOT NULL DEFAULT 'data',
+  data_source ENUM('sina','eastmoney','auto') NOT NULL DEFAULT 'sina',
+  top_n INT NOT NULL DEFAULT 30,
+  last_trigger_date DATE NULL,
+  last_job_id BIGINT UNSIGNED NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_schedule_job FOREIGN KEY (last_job_id) REFERENCES system_job(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO task_schedule(id) VALUES(1);

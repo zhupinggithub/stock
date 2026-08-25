@@ -11,7 +11,7 @@ def runs(): return fetch_all("""SELECT ir.id,ir.observed_at,ir.data_source,ir.ca
 @router.get("/{run_id}")
 def detail(run_id:int):
     groups=fetch_all("SELECT * FROM intraday_group_result WHERE intraday_run_id=:id ORDER BY top_n",{"id":run_id})
-    values=fetch_all("""SELECT pc.ranking,sm.stock_code,sm.stock_name,pc.score,ic.current_price,ic.previous_close,
+    values=fetch_all("""SELECT pc.ranking,sm.stock_code,sm.stock_name,sm.market,pc.score,ic.current_price,ic.previous_close,
       ic.current_return,ic.market_excess,ic.is_up FROM intraday_candidate ic
       JOIN prediction_candidate pc ON pc.id=ic.candidate_id JOIN stock_master sm ON sm.id=pc.stock_id
       WHERE ic.intraday_run_id=:id ORDER BY pc.ranking""",{"id":run_id})

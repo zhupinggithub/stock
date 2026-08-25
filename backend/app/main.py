@@ -1,4 +1,5 @@
 from pathlib import Path
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -6,12 +7,19 @@ from backend.app.api import dashboard,intraday,predictions,stocks,tasks,verifica
 from backend.app.database import init_schema
 from backend.app.repositories.query_repository import fetch_one
 from backend.app.services.job_service import recover_interrupted_jobs
+from backend.app.services.schedule_service import start_scheduler,stop_scheduler
 
 ROOT=Path(__file__).resolve().parents[2]
 DIST=ROOT/"frontend"/"dist"
 init_schema()
 recover_interrupted_jobs()
-app=FastAPI(title="A股量化观察台",version="1.0.0")
+@asynccontextmanager
+async def lifespan(app:FastAPI):
+    start_scheduler()
+    yield
+    stop_scheduler()
+
+app=FastAPI(title="A股量化观察台",version="1.0.0",lifespan=lifespan)
 for router in (dashboard.router,predictions.router,intraday.router,verifications.router,stocks.router,tasks.router): app.include_router(router,prefix="/api")
 
 @app.get("/api/health",tags=["system"])
