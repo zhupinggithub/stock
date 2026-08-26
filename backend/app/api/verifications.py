@@ -4,7 +4,7 @@ from backend.app.repositories.query_repository import fetch_all
 router=APIRouter(prefix="/verifications",tags=["verifications"])
 
 @router.get("")
-def runs(): return fetch_all("""SELECT vr.id,pr.base_date,vr.actual_trade_date,vr.candidate_count,vr.verified_count,
+def runs(): return fetch_all("""SELECT vr.id,pr.base_date,pr.model_code,pr.model_version,vr.actual_trade_date,vr.candidate_count,vr.verified_count,
  vr.unverified_count,vr.market_stock_count,vr.market_avg_return,vr.market_up_rate,vr.score_rank_ic,vr.verified_at
  FROM verification_run vr JOIN prediction_run pr ON pr.id=vr.prediction_run_id ORDER BY vr.actual_trade_date DESC""")
 

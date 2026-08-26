@@ -21,5 +21,8 @@ data/list_*.csv
 data/predictions/factor_report_*.csv
 data/predictions/model_summary_*.json
 data/predictions/next_day_candidates_*.csv
+data/predictions/tradeable_candidates_*.csv
+data/predictions/tradeable_factor_report_*.csv
+data/predictions/tradeable_model_summary_*.json
 data/predictions/intraday/
 data/predictions/verification/

@@ -5,7 +5,7 @@ router=APIRouter(prefix="/intraday",tags=["intraday"])
 
 @router.get("")
 def runs(): return fetch_all("""SELECT ir.id,ir.observed_at,ir.data_source,ir.candidate_count,ir.valid_candidate_count,
- ir.market_stock_count,ir.market_avg_return,ir.market_up_rate,ir.score_rank_ic,pr.base_date
+ ir.market_stock_count,ir.market_avg_return,ir.market_up_rate,ir.score_rank_ic,pr.base_date,pr.model_code,pr.model_version
  FROM intraday_run ir JOIN prediction_run pr ON pr.id=ir.prediction_run_id ORDER BY ir.observed_at DESC""")
 
 @router.get("/{run_id}")

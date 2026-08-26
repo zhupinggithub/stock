@@ -131,6 +131,8 @@ def verify_one(
     groups = sorted({min(value, len(detail)) for value in top_groups if value > 0})
     group_metrics = [calculate_group_metrics(detail, benchmark_return, value) for value in groups]
     summary: dict[str, object] = {
+        "模型代码": "multi_factor_rank",
+        "模型名称": "次日方向模型",
         "预测文件": prediction_file.name,
         "预测基准日": base_date.strftime("%Y-%m-%d"),
         "实际交易日": actual_date.strftime("%Y-%m-%d"),

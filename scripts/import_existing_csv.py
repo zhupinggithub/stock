@@ -17,6 +17,9 @@ def main():
     for c in sorted(pred.glob("next_day_candidates_*.csv")):
         label=c.stem.rsplit("_",1)[-1]; f=pred/f"factor_report_{label}.csv"; s=pred/f"model_summary_{label}.json"
         if f.exists() and s.exists(): candidates += import_prediction(c,f,s,db)
+    for c in sorted(pred.glob("tradeable_candidates_*.csv")):
+        label=c.stem.rsplit("_",1)[-1]; f=pred/f"tradeable_factor_report_{label}.csv"; s=pred/f"tradeable_model_summary_{label}.json"
+        if f.exists() and s.exists(): candidates += import_prediction(c,f,s,db)
     idir=pred/"intraday"
     for s in sorted(idir.glob("intraday_summary_*.json")):
         suffix=s.stem.removeprefix("intraday_summary_"); d=idir/f"intraday_detail_{suffix}.csv"; g=idir/f"intraday_groups_{suffix}.csv"
@@ -24,6 +27,9 @@ def main():
     verified=0; vdir=pred/"verification"
     for s in sorted(vdir.glob("verification_summary_*.json")):
         label=s.stem.rsplit("_",1)[-1]; d=vdir/f"verification_detail_{label}.csv"; g=vdir/f"verification_groups_{label}.csv"
+        if d.exists() and g.exists(): verified += import_verification(d,g,s,db)
+    for s in sorted(vdir.glob("tradeable_verification_summary_*.json")):
+        label=s.stem.rsplit("_",1)[-1]; d=vdir/f"tradeable_verification_detail_{label}.csv"; g=vdir/f"tradeable_verification_groups_{label}.csv"
         if d.exists() and g.exists(): verified += import_verification(d,g,s,db)
     print(f"导入完成：股票 {stocks} 只，日线 {market} 行，候选 {candidates} 行，盘中明细 {intraday} 行，验证明细 {verified} 行")
 

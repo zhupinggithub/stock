@@ -94,6 +94,9 @@ def add_features(data: pd.DataFrame) -> pd.DataFrame:
     )
     result["gap"] = result["开盘"] / previous_close - 1
     result["next_return"] = group["收盘"].shift(-1) / close - 1
+    # Executable A-share T+1 target for a signal produced after today's close:
+    # buy at the next trading day's open and sell at the following trading day's open.
+    result["tradeable_return"] = group["开盘"].shift(-2) / group["开盘"].shift(-1) - 1
     result["history_count"] = group.cumcount() + 1
     return result
 
@@ -103,11 +106,11 @@ def cross_section_rank(frame: pd.DataFrame, column: str) -> pd.Series:
 
 
 def estimate_factor_weights(
-    data: pd.DataFrame, ic_days: int
+    data: pd.DataFrame, ic_days: int, target_column: str = "next_return"
 ) -> tuple[dict[str, float], pd.DataFrame]:
-    usable_dates = sorted(data.loc[data["next_return"].notna(), DATE].unique())[-ic_days:]
+    usable_dates = sorted(data.loc[data[target_column].notna(), DATE].unique())[-ic_days:]
     sample = data[data[DATE].isin(usable_dates)].copy()
-    target_rank = cross_section_rank(sample, "next_return")
+    target_rank = cross_section_rank(sample, target_column)
     report_rows = []
 
     for feature, label in FEATURES.items():
@@ -178,16 +181,17 @@ def rank_latest(
 
 
 def add_return_estimates(
-    featured: pd.DataFrame, candidates: pd.DataFrame, max_train_days: int = 120
+    featured: pd.DataFrame, candidates: pd.DataFrame, max_train_days: int = 120,
+    target_column: str = "next_return", price_basis: bool = True,
 ) -> tuple[pd.DataFrame, dict[str, float | int | str]]:
     """Add an experimental ridge return estimate and residual-based interval."""
-    usable = featured[featured["next_return"].notna()].copy()
+    usable = featured[featured[target_column].notna()].copy()
     train_dates = sorted(usable[DATE].dropna().unique())[-max_train_days:]
     usable = usable[usable[DATE].isin(train_dates)]
     ranked = pd.DataFrame(index=usable.index)
     for feature in FEATURES:
         ranked[feature] = usable.groupby(DATE)[feature].rank(pct=True) - 0.5
-    ranked["target"] = usable["next_return"]
+    ranked["target"] = usable[target_column]
     ranked = ranked.dropna()
     if len(train_dates) < 5 or len(ranked) < 1000:
         raise RuntimeError("历史样本不足以估计个股预期收益")
@@ -211,15 +215,20 @@ def add_return_estimates(
     probability = np.array([normal.cdf(value / residual_std) for value in expected])
     lower = expected - 1.645 * residual_std
     upper = expected + 1.645 * residual_std
-    base_price = candidates["收盘"].to_numpy(dtype=float)
     result = candidates.copy()
     result["上涨概率"] = probability
     result["预计次日收益"] = expected
     result["预计收益下限90"] = lower
     result["预计收益上限90"] = upper
-    result["预计目标价格"] = base_price * (1 + expected)
-    result["预计价格下限90"] = base_price * (1 + lower)
-    result["预计价格上限90"] = base_price * (1 + upper)
+    if price_basis:
+        base_price = candidates["收盘"].to_numpy(dtype=float)
+        result["预计目标价格"] = base_price * (1 + expected)
+        result["预计价格下限90"] = base_price * (1 + lower)
+        result["预计价格上限90"] = base_price * (1 + upper)
+    else:
+        result["预计目标价格"] = np.nan
+        result["预计价格下限90"] = np.nan
+        result["预计价格上限90"] = np.nan
     # Confidence reflects time coverage, not the probability of being correct.
     result["预测置信度"] = min(1.0, len(train_dates) / 120.0)
     return result, {
@@ -238,9 +247,9 @@ def historical_top_summary(
     top_n: int,
     ic_days: int,
     min_history: int,
-    min_amount: float,
+    min_amount: float, target_column: str = "next_return",
 ) -> dict[str, float | int]:
-    dates = sorted(featured.loc[featured["next_return"].notna(), DATE].unique())[-ic_days:]
+    dates = sorted(featured.loc[featured[target_column].notna(), DATE].unique())[-ic_days:]
     returns = []
     universe_returns = []
     for day_value in dates:
@@ -248,7 +257,7 @@ def historical_top_summary(
         day = day[
             (day["history_count"] >= min_history)
             & (day["amount_ma20"] >= min_amount)
-            & day["next_return"].notna()
+            & day[target_column].notna()
             & (~day[NAME].astype(str).str.upper().str.contains("ST", na=False))
         ]
         if len(day) < max(100, top_n):
@@ -256,9 +265,9 @@ def historical_top_summary(
         score = pd.Series(0.0, index=day.index)
         for feature, weight in weights.items():
             score += (day[feature].rank(pct=True).fillna(0.5) - 0.5) * weight
-        selected = day.loc[score.nlargest(top_n).index, "next_return"]
+        selected = day.loc[score.nlargest(top_n).index, target_column]
         returns.extend(selected.tolist())
-        universe_returns.extend(day["next_return"].tolist())
+        universe_returns.extend(day[target_column].tolist())
     if not returns:
         return {"样本内检验交易日": 0}
     return {
@@ -293,15 +302,16 @@ def main() -> None:
 
     data = load_market_data(args.data_dir)
     featured = add_features(data)
-    weights, factor_report = estimate_factor_weights(featured, args.ic_days)
+    weights, factor_report = estimate_factor_weights(featured, args.ic_days, "next_return")
     candidates = rank_latest(
         featured, weights, args.top, args.min_history, args.min_amount
     )
-    candidates, return_model_summary = add_return_estimates(featured, candidates)
+    candidates, return_model_summary = add_return_estimates(featured, candidates, target_column="next_return")
     summary = historical_top_summary(
-        featured, weights, args.top, args.ic_days, args.min_history, args.min_amount
+        featured, weights, args.top, args.ic_days, args.min_history, args.min_amount, "next_return"
     )
     summary.update(return_model_summary)
+    summary.update({"模型代码":"multi_factor_rank","模型版本":"1.0.0","模型名称":"次日方向模型","收益口径":"信号日收盘至下一交易日收盘"})
 
     label = candidates.iloc[0]["预测基准日"].replace("-", "")
     candidate_path = output_dir / f"next_day_candidates_{label}.csv"
@@ -313,10 +323,30 @@ def main() -> None:
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
+    trade_weights, trade_factor_report = estimate_factor_weights(featured, args.ic_days, "tradeable_return")
+    trade_candidates = rank_latest(featured, trade_weights, args.top, args.min_history, args.min_amount)
+    trade_candidates, trade_return_summary = add_return_estimates(
+        featured, trade_candidates, target_column="tradeable_return", price_basis=False
+    )
+    trade_summary = historical_top_summary(
+        featured, trade_weights, args.top, args.ic_days, args.min_history, args.min_amount, "tradeable_return"
+    )
+    trade_summary.update(trade_return_summary)
+    trade_summary.update({"模型代码":"tradeable_t1_open","模型版本":"1.0.0","模型名称":"T+1可交易模型","收益口径":"下一交易日开盘买入，再下一交易日开盘卖出"})
+    trade_candidate_path = output_dir / f"tradeable_candidates_{label}.csv"
+    trade_factor_path = output_dir / f"tradeable_factor_report_{label}.csv"
+    trade_summary_path = output_dir / f"tradeable_model_summary_{label}.json"
+    trade_candidates.to_csv(trade_candidate_path, index=False, encoding="utf-8-sig")
+    trade_factor_report.to_csv(trade_factor_path, index=False, encoding="utf-8-sig")
+    trade_summary_path.write_text(json.dumps(trade_summary, ensure_ascii=False, indent=2), encoding="utf-8")
+
     print(f"数据最新交易日：{candidates.iloc[0]['预测基准日']}")
     print(f"候选结果：{candidate_path}")
     print(f"因子报告：{factor_path}")
     print(f"历史检验：{summary_path}")
+    print(f"T+1可交易候选：{trade_candidate_path}")
+    print(f"T+1可交易因子：{trade_factor_path}")
+    print(f"T+1可交易检验：{trade_summary_path}")
     print("前10名：")
     print(candidates[[CODE, NAME, "综合评分", "收盘"]].head(10).to_string(index=False))
     print("历史检验摘要：", summary)
