@@ -159,3 +159,96 @@ CREATE TABLE IF NOT EXISTS task_schedule (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT IGNORE INTO task_schedule(id) VALUES(1);
+
+CREATE TABLE IF NOT EXISTS app_user (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, username VARCHAR(50) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL, display_name VARCHAR(100) NOT NULL,
+  email VARCHAR(150) NULL, mobile VARCHAR(30) NULL,
+  status ENUM('active','disabled','locked') NOT NULL DEFAULT 'active',
+  must_change_password TINYINT(1) NOT NULL DEFAULT 0, failed_login_count INT NOT NULL DEFAULT 0,
+  locked_until DATETIME NULL, last_login_at DATETIME NULL, last_login_ip VARCHAR(64) NULL,
+  password_changed_at DATETIME NULL, created_by BIGINT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY(id), UNIQUE KEY uk_user_username(username), UNIQUE KEY uk_user_email(email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS app_role (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, role_code VARCHAR(50) NOT NULL,
+  role_name VARCHAR(100) NOT NULL, description VARCHAR(255) NULL,
+  is_system TINYINT(1) NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(id), UNIQUE KEY uk_role_code(role_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS app_permission (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, permission_code VARCHAR(100) NOT NULL,
+  permission_name VARCHAR(100) NOT NULL, permission_group VARCHAR(50) NOT NULL,
+  description VARCHAR(255) NULL, PRIMARY KEY(id), UNIQUE KEY uk_permission_code(permission_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS app_user_role (
+  user_id BIGINT UNSIGNED NOT NULL, role_id BIGINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,role_id),
+  CONSTRAINT fk_user_role_user FOREIGN KEY(user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+  CONSTRAINT fk_user_role_role FOREIGN KEY(role_id) REFERENCES app_role(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS app_role_permission (
+  role_id BIGINT UNSIGNED NOT NULL, permission_id BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY(role_id,permission_id),
+  CONSTRAINT fk_role_permission_role FOREIGN KEY(role_id) REFERENCES app_role(id) ON DELETE CASCADE,
+  CONSTRAINT fk_role_permission_permission FOREIGN KEY(permission_id) REFERENCES app_permission(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS app_session (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, user_id BIGINT UNSIGNED NOT NULL,
+  token_hash CHAR(64) NOT NULL, csrf_token CHAR(64) NOT NULL, expires_at DATETIME NOT NULL,
+  revoked_at DATETIME NULL, ip_address VARCHAR(64) NULL, user_agent VARCHAR(500) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(id), UNIQUE KEY uk_session_token(token_hash), KEY idx_session_user(user_id),
+  CONSTRAINT fk_session_user FOREIGN KEY(user_id) REFERENCES app_user(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS password_reset_token (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, user_id BIGINT UNSIGNED NOT NULL,
+  token_hash CHAR(64) NOT NULL, expires_at DATETIME NOT NULL, used_at DATETIME NULL,
+  created_by BIGINT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(id), UNIQUE KEY uk_reset_token(token_hash), KEY idx_reset_user(user_id),
+  CONSTRAINT fk_reset_user FOREIGN KEY(user_id) REFERENCES app_user(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS audit_log (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, user_id BIGINT UNSIGNED NULL,
+  username VARCHAR(50) NULL, action VARCHAR(100) NOT NULL, resource_type VARCHAR(50) NULL,
+  resource_id VARCHAR(100) NULL, request_method VARCHAR(10) NULL, request_path VARCHAR(500) NULL,
+  request_ip VARCHAR(64) NULL, success TINYINT(1) NOT NULL, detail JSON NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id),
+  KEY idx_audit_user_time(user_id,created_at), KEY idx_audit_action_time(action,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO app_role(role_code,role_name,description,is_system) VALUES
+('admin','管理员','全部系统权限',1),('operator','操作员','执行任务并查看业务数据',1),('viewer','观察员','只读查看业务数据',1);
+
+INSERT IGNORE INTO app_permission(permission_code,permission_name,permission_group) VALUES
+('dashboard:view','查看市场总览','业务查看'),('stock:view','查看行情','业务查看'),
+('prediction:view','查看预测','业务查看'),('verification:view','查看验证','业务查看'),
+('intraday:view','查看盘中观察','业务查看'),('task:view','查看任务与日志','任务'),
+('task:collect','拉取行情','任务'),('task:predict','执行预测','任务'),('task:verify','执行验证','任务'),
+('task:intraday','执行盘中观察','任务'),('task:pipeline','执行完整流水线','任务'),
+('schedule:view','查看定时配置','定时任务'),('schedule:update','修改定时配置','定时任务'),
+('user:view','查看用户','账号管理'),('user:create','创建用户','账号管理'),
+('user:update','编辑用户','账号管理'),('user:disable','启停用户','账号管理'),
+('user:reset_password','重置密码','账号管理'),('role:view','查看角色权限','账号管理'),
+('role:manage','管理自定义角色','账号管理'),('session:manage','管理登录设备','账号管理'),
+('audit:view','查看审计日志','审计');
+
+INSERT IGNORE INTO app_role_permission(role_id,permission_id)
+SELECT r.id,p.id FROM app_role r CROSS JOIN app_permission p WHERE r.role_code='admin';
+INSERT IGNORE INTO app_role_permission(role_id,permission_id)
+SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.permission_code IN
+('dashboard:view','stock:view','prediction:view','verification:view','intraday:view','task:view','task:collect','task:predict','task:verify','task:intraday','task:pipeline','schedule:view')
+WHERE r.role_code='operator';
+INSERT IGNORE INTO app_role_permission(role_id,permission_id)
+SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.permission_code IN
+('dashboard:view','stock:view','prediction:view','verification:view','intraday:view')
+WHERE r.role_code='viewer';

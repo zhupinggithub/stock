@@ -1,7 +1,8 @@
-from fastapi import APIRouter,HTTPException
+from fastapi import APIRouter,Depends,HTTPException
+from backend.app.services.auth_service import require_permission
 from backend.app.repositories.query_repository import fetch_all
 
-router=APIRouter(prefix="/verifications",tags=["verifications"])
+router=APIRouter(prefix="/verifications",tags=["verifications"],dependencies=[Depends(require_permission("verification:view"))])
 
 @router.get("")
 def runs(): return fetch_all("""SELECT vr.id,pr.base_date,pr.model_code,pr.model_version,vr.actual_trade_date,vr.candidate_count,vr.verified_count,

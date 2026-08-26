@@ -82,13 +82,13 @@ chmod +x stop_web.sh
 也可以不使用启动脚本，直接启动后端：
 
 ```bash
-python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 6688
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 9999
 ```
 
 启动脚本会在后台运行 FastAPI，并把 PID 和日志保存在 `.runtime/`；重复启动不会创建第二个进程。停止脚本只终止 PID 文件记录的服务。后端同时托管已经构建到 `frontend/dist` 的 Vue 生产页面。
 
-- 页面：http://127.0.0.1:6688
-- API 文档：http://127.0.0.1:6688/docs
+- 页面：http://127.0.0.1:9999
+- API 文档：http://127.0.0.1:9999/docs
 
 页面中的“任务中心”可以后台执行行情增量采集、预测、正式验证、盘中观察和完整每日流水线，并显示任务进度、日志及失败原因。同一时间只允许一个任务运行，避免重复点击造成并发写入。
 
@@ -99,7 +99,7 @@ cd frontend
 npm run dev
 ```
 
-Vite 会把 `/api` 转发到本机 6688 端口。
+Vite 会把 `/api` 转发到本机 9999 端口。
 
 ## 兼容命令
 
@@ -134,3 +134,20 @@ npm --prefix frontend run build
 模型输出是研究候选名单，不是买卖建议。当前历史摘要属于短样本内检验，正式效果应以持续的下一交易日验证为准。
 
 `stock_daily` 使用 `(stock_id, trade_date)` 唯一键并通过 upsert 写入；重复导入同一股票同一交易日不会产生重复行情。
+
+## 账号与权限
+
+系统使用 HttpOnly 会话 Cookie、CSRF 防护和角色权限控制。登录页支持自助注册，注册账号默认分配只读角色。系统内置管理员、操作员、只读用户三种角色，也支持在页面创建自定义角色。管理员可以管理用户、禁用账号、生成一小时有效的密码重置链接、撤销登录设备并查询审计日志。首次登录无需强制修改密码；连续登录失败 5 次会锁定 15 分钟。
+
+本机首次创建管理员：
+
+```powershell
+python scripts/manage_users.py create-admin --username admin --display-name 管理员 --generate
+```
+
+本机应急重置密码和查看账号：
+
+```powershell
+python scripts/manage_users.py reset-password --username admin --generate
+python scripts/manage_users.py list
+```

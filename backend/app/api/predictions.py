@@ -1,7 +1,8 @@
-from fastapi import APIRouter,HTTPException
+from fastapi import APIRouter,Depends,HTTPException
+from backend.app.services.auth_service import require_permission
 from backend.app.repositories.query_repository import fetch_all,fetch_one
 
-router=APIRouter(prefix="/predictions",tags=["predictions"])
+router=APIRouter(prefix="/predictions",tags=["predictions"],dependencies=[Depends(require_permission("prediction:view"))])
 
 @router.get("")
 def runs(): return fetch_all("""SELECT id,base_date,model_code,model_version,top_n,backtest_trade_days,

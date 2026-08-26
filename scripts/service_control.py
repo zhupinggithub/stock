@@ -10,6 +10,11 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1];RUNTIME=ROOT/".runtime";PID_FILE=RUNTIME/"web.pid"
 
+def healthy(port:str)->bool:
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health",timeout=1) as response:return response.status==200
+    except Exception:return False
+
 def alive(pid:int)->bool:
     if os.name=="nt":
         import ctypes
@@ -21,22 +26,27 @@ def alive(pid:int)->bool:
 
 def start()->int:
     RUNTIME.mkdir(exist_ok=True)
+    port=os.getenv("STOCK_APP_PORT","9999")
     if PID_FILE.exists():
         try: pid=int(PID_FILE.read_text().strip())
         except ValueError: pid=0
-        if pid and alive(pid): print(f"Web service is already running. PID={pid} URL=http://127.0.0.1:6688");return 0
+        if pid and alive(pid) and healthy(port): print(f"Web service is already running. PID={pid} URL=http://127.0.0.1:{port}");return 0
+        if pid and alive(pid):
+            if os.name=="nt":subprocess.run(["taskkill","/PID",str(pid),"/T","/F"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            else:
+                try:os.killpg(pid,signal.SIGTERM)
+                except ProcessLookupError:pass
         PID_FILE.unlink(missing_ok=True)
     out=(RUNTIME/"web.out.log").open("ab");err=(RUNTIME/"web.error.log").open("ab")
     kwargs={"cwd":ROOT,"stdout":out,"stderr":err,"stdin":subprocess.DEVNULL,"close_fds":True}
     if os.name=="nt": kwargs["creationflags"]=subprocess.DETACHED_PROCESS|subprocess.CREATE_NEW_PROCESS_GROUP
     else: kwargs["start_new_session"]=True
-    port=os.getenv("STOCK_APP_PORT","6688")
     process=subprocess.Popen([sys.executable,"-m","uvicorn","backend.app.main:app","--host",os.getenv("STOCK_APP_HOST","127.0.0.1"),"--port",port],**kwargs)
     PID_FILE.write_text(str(process.pid),encoding="ascii")
     for _ in range(60):
         if process.poll() is not None: PID_FILE.unlink(missing_ok=True);print("Web service failed to start; see .runtime/web.error.log",file=sys.stderr);return 1
         try:
-            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health",timeout=.5).close()
+            if not healthy(port):raise OSError("health check failed")
             print(f"Web service started. PID={process.pid} URL=http://127.0.0.1:{port}");return 0
         except Exception: time.sleep(.5)
     print(f"Web process started but health check timed out. PID={process.pid}",file=sys.stderr);return 1
@@ -67,6 +77,7 @@ def main()->int:
     parser=argparse.ArgumentParser();parser.add_argument("action",choices=("start","stop","status"));args=parser.parse_args()
     if args.action=="start":return start()
     if args.action=="stop":return stop()
-    if PID_FILE.exists() and alive(int(PID_FILE.read_text().strip())):print(f"running PID={PID_FILE.read_text().strip()}");return 0
+    port=os.getenv("STOCK_APP_PORT","9999")
+    if PID_FILE.exists() and alive(int(PID_FILE.read_text().strip())) and healthy(port):print(f"running PID={PID_FILE.read_text().strip()} URL=http://127.0.0.1:{port}");return 0
     print("stopped");return 1
 if __name__=="__main__":raise SystemExit(main())

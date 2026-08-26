@@ -45,7 +45,7 @@ def _tick()->None:
     schedule=get_schedule(); now=datetime.now(); today=date.today()
     if not schedule["enabled"] or today.isoweekday() not in _weekdays(schedule["weekdays"]): return
     if now.time()<schedule["run_time"] or schedule["last_trigger_date"]==today: return
-    try: job_id=submit_job("pipeline",schedule["data_dir"],schedule["data_source"],schedule["top_n"])
+    try: job_id=submit_job("pipeline",schedule["data_dir"],schedule["data_source"],schedule["top_n"],trigger_type="schedule")
     except RuntimeError: return
     with engine().begin() as conn:
         conn.execute(text("UPDATE task_schedule SET last_trigger_date=:today,last_job_id=:job WHERE id=1"),{"today":today,"job":job_id})

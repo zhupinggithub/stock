@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from backend.app.api import dashboard,intraday,predictions,stocks,tasks,verifications
+from backend.app.api import admin,auth,dashboard,intraday,predictions,stocks,tasks,verifications
 from backend.app.database import init_schema
 from backend.app.repositories.query_repository import fetch_one
 from backend.app.services.job_service import recover_interrupted_jobs
@@ -20,7 +20,7 @@ async def lifespan(app:FastAPI):
     stop_scheduler()
 
 app=FastAPI(title="A股量化观察台",version="1.0.0",lifespan=lifespan)
-for router in (dashboard.router,predictions.router,intraday.router,verifications.router,stocks.router,tasks.router): app.include_router(router,prefix="/api")
+for router in (auth.router,admin.router,dashboard.router,predictions.router,intraday.router,verifications.router,stocks.router,tasks.router): app.include_router(router,prefix="/api")
 
 @app.get("/api/health",tags=["system"])
 def health(): return {"status":"ok","database":fetch_one("SELECT DATABASE() name,VERSION() version")}

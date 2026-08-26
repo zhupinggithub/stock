@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter,Depends
+from backend.app.services.auth_service import require_permission
 from backend.app.repositories.query_repository import fetch_all, fetch_one
 
-router=APIRouter(prefix="/dashboard",tags=["dashboard"])
+router=APIRouter(prefix="/dashboard",tags=["dashboard"],dependencies=[Depends(require_permission("dashboard:view"))])
 
 @router.get("")
 def dashboard():

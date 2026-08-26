@@ -1,7 +1,8 @@
-from fastapi import APIRouter,HTTPException
+from fastapi import APIRouter,Depends,HTTPException
+from backend.app.services.auth_service import require_permission
 from backend.app.repositories.query_repository import fetch_all
 
-router=APIRouter(prefix="/intraday",tags=["intraday"])
+router=APIRouter(prefix="/intraday",tags=["intraday"],dependencies=[Depends(require_permission("intraday:view"))])
 
 @router.get("")
 def runs(): return fetch_all("""SELECT ir.id,ir.observed_at,ir.data_source,ir.candidate_count,ir.valid_candidate_count,

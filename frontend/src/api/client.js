@@ -1,3 +1,4 @@
-export async function get(path){const r=await fetch(`/api${path}`);if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail||`HTTP ${r.status}`)}return r.json()}
-export const fmt=(v,d=2)=>v==null?'—':Number(v).toLocaleString('zh-CN',{maximumFractionDigits:d})
-export const pct=v=>v==null?'—':`${(Number(v)*100).toFixed(2)}%`
+let csrfToken='';export function setCsrfToken(value){csrfToken=value||''}
+export async function request(path,options={}){const headers={...(options.body?{'Content-Type':'application/json'}:{}),...(csrfToken?{'X-CSRF-Token':csrfToken}:{}),...(options.headers||{})};const r=await fetch(`/api${path}`,{credentials:'same-origin',...options,headers});if(r.status===401)window.dispatchEvent(new Event('auth-expired'));if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail||`HTTP ${r.status}`)}if(r.status===204)return null;return r.json()}
+export const get=path=>request(path);export const post=(path,body)=>request(path,{method:'POST',body:JSON.stringify(body)});export const put=(path,body)=>request(path,{method:'PUT',body:JSON.stringify(body)});export const del=path=>request(path,{method:'DELETE'});
+export const fmt=(v,d=2)=>v==null?'—':Number(v).toLocaleString('zh-CN',{maximumFractionDigits:d});export const pct=v=>v==null?'—':`${(Number(v)*100).toFixed(2)}%`;

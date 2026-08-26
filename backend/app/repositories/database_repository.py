@@ -39,6 +39,11 @@ def init_schema(db: Engine | None = None) -> None:
         }
         for column,column_type in additions.items():
             if column not in existing: conn.execute(text(f"ALTER TABLE prediction_candidate ADD COLUMN {column} {column_type} NULL"))
+        job_columns={row[0] for row in conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='system_job'"))}
+        if "created_by" not in job_columns: conn.execute(text("ALTER TABLE system_job ADD COLUMN created_by BIGINT UNSIGNED NULL"))
+        if "trigger_type" not in job_columns: conn.execute(text("ALTER TABLE system_job ADD COLUMN trigger_type ENUM('manual','schedule','system') NOT NULL DEFAULT 'manual'"))
+        conn.execute(text("ALTER TABLE app_user MODIFY must_change_password TINYINT(1) NOT NULL DEFAULT 0"))
+        conn.execute(text("UPDATE app_user SET must_change_password=0 WHERE must_change_password<>0"))
 
 def clean(value: Any) -> Any:
     return None if pd.isna(value) else value

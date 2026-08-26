@@ -1,7 +1,8 @@
-from fastapi import APIRouter,HTTPException,Query
+from fastapi import APIRouter,Depends,HTTPException,Query
+from backend.app.services.auth_service import require_permission
 from backend.app.repositories.query_repository import fetch_all
 
-router=APIRouter(prefix="/stocks",tags=["stocks"])
+router=APIRouter(prefix="/stocks",tags=["stocks"],dependencies=[Depends(require_permission("stock:view"))])
 
 @router.get("")
 def stocks(q:str="",market:str="",page:int=Query(1,ge=1),page_size:int=Query(20,ge=5,le=100),
