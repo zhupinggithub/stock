@@ -72,6 +72,24 @@ CREATE TABLE IF NOT EXISTS candidate_factor (
   CONSTRAINT fk_candidate_factor FOREIGN KEY (candidate_id) REFERENCES prediction_candidate(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS prediction_stock_rank (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  prediction_run_id BIGINT UNSIGNED NOT NULL, stock_id BIGINT UNSIGNED NOT NULL,
+  full_ranking INT NOT NULL, ranking_percentile DECIMAL(14,10) NOT NULL,
+  score DECIMAL(14,8) NOT NULL, base_close DECIMAL(12,4),
+  up_probability DECIMAL(14,10), expected_return DECIMAL(14,10),
+  return_low_90 DECIMAL(14,10), return_high_90 DECIMAL(14,10),
+  is_candidate TINYINT(1) NOT NULL DEFAULT 0, candidate_ranking INT,
+  daily_return DECIMAL(14,10), return_5d DECIMAL(14,10),
+  volume_ratio_20 DECIMAL(14,10), avg_amount_20 DECIMAL(24,4), volatility_10 DECIMAL(14,10),
+  factor_values JSON, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), UNIQUE KEY uk_rank_run_stock (prediction_run_id,stock_id),
+  UNIQUE KEY uk_rank_run_position (prediction_run_id,full_ranking),
+  KEY idx_rank_stock_history (stock_id,prediction_run_id), KEY idx_rank_run_candidate (prediction_run_id,is_candidate),
+  CONSTRAINT fk_stock_rank_run FOREIGN KEY (prediction_run_id) REFERENCES prediction_run(id) ON DELETE CASCADE,
+  CONSTRAINT fk_stock_rank_stock FOREIGN KEY (stock_id) REFERENCES stock_master(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS intraday_run (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, prediction_run_id BIGINT UNSIGNED NOT NULL,
   observed_at DATETIME NOT NULL, data_source VARCHAR(30) NOT NULL,

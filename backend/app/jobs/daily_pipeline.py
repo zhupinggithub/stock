@@ -29,9 +29,9 @@ def main() -> None:
     run("scripts/verify_predictions.py","--data-dir",str(args.data_dir))
     run("scripts/stock_predictor.py","--data-dir",str(args.data_dir),"--top",str(args.top))
     pred=args.data_dir/"predictions"; candidates=sorted(pred.glob("next_day_candidates_*.csv"))[-1]; label=candidates.stem.rsplit("_",1)[-1]
-    count=import_prediction(candidates,pred/f"factor_report_{label}.csv",pred/f"model_summary_{label}.json",db)
+    count=import_prediction(candidates,pred/f"factor_report_{label}.csv",pred/f"model_summary_{label}.json",db,pred/f"all_stock_rankings_{label}.csv")
     trade_candidates=pred/f"tradeable_candidates_{label}.csv"
-    if trade_candidates.exists(): count += import_prediction(trade_candidates,pred/f"tradeable_factor_report_{label}.csv",pred/f"tradeable_model_summary_{label}.json",db)
+    if trade_candidates.exists(): count += import_prediction(trade_candidates,pred/f"tradeable_factor_report_{label}.csv",pred/f"tradeable_model_summary_{label}.json",db,pred/f"tradeable_all_stock_rankings_{label}.csv")
     vdir=args.data_dir/"predictions"/"verification"
     for s in sorted(vdir.glob("verification_summary_*.json")):
         vlabel=s.stem.rsplit("_",1)[-1]; d=vdir/f"verification_detail_{vlabel}.csv"; g=vdir/f"verification_groups_{vlabel}.csv"

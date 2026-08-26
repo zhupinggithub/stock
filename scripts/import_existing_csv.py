@@ -16,10 +16,10 @@ def main():
     pred=args.data_dir/"predictions"; candidates=0; intraday=0
     for c in sorted(pred.glob("next_day_candidates_*.csv")):
         label=c.stem.rsplit("_",1)[-1]; f=pred/f"factor_report_{label}.csv"; s=pred/f"model_summary_{label}.json"
-        if f.exists() and s.exists(): candidates += import_prediction(c,f,s,db)
+        if f.exists() and s.exists(): candidates += import_prediction(c,f,s,db,pred/f"all_stock_rankings_{label}.csv")
     for c in sorted(pred.glob("tradeable_candidates_*.csv")):
         label=c.stem.rsplit("_",1)[-1]; f=pred/f"tradeable_factor_report_{label}.csv"; s=pred/f"tradeable_model_summary_{label}.json"
-        if f.exists() and s.exists(): candidates += import_prediction(c,f,s,db)
+        if f.exists() and s.exists(): candidates += import_prediction(c,f,s,db,pred/f"tradeable_all_stock_rankings_{label}.csv")
     idir=pred/"intraday"
     for s in sorted(idir.glob("intraday_summary_*.json")):
         suffix=s.stem.removeprefix("intraday_summary_"); d=idir/f"intraday_detail_{suffix}.csv"; g=idir/f"intraday_groups_{suffix}.csv"

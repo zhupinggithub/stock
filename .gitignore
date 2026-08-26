@@ -24,5 +24,7 @@ data/predictions/next_day_candidates_*.csv
 data/predictions/tradeable_candidates_*.csv
 data/predictions/tradeable_factor_report_*.csv
 data/predictions/tradeable_model_summary_*.json
+data/predictions/all_stock_rankings_*.csv
+data/predictions/tradeable_all_stock_rankings_*.csv
 data/predictions/intraday/
 data/predictions/verification/

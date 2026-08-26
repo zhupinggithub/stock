@@ -146,7 +146,7 @@ def estimate_factor_weights(
 def rank_latest(
     featured: pd.DataFrame,
     weights: dict[str, float],
-    top_n: int,
+    top_n: int | None,
     min_history: int,
     min_amount: float,
 ) -> pd.DataFrame:
@@ -177,7 +177,8 @@ def rank_latest(
         "预测基准日", CODE, NAME, "综合评分", "收盘", "当日涨跌幅", "近5日涨跌幅",
         "量比20日", "近20日平均成交额", "波动率10日",
     ] + [f"因子分位_{label}" for label in FEATURES.values()]
-    return latest.sort_values("综合评分", ascending=False)[columns].head(top_n).reset_index(drop=True)
+    ranked=latest.sort_values(["综合评分",CODE],ascending=[False,True])[columns].reset_index(drop=True)
+    return ranked.head(top_n).copy() if top_n is not None else ranked
 
 
 def add_return_estimates(
@@ -303,10 +304,9 @@ def main() -> None:
     data = load_market_data(args.data_dir)
     featured = add_features(data)
     weights, factor_report = estimate_factor_weights(featured, args.ic_days, "next_return")
-    candidates = rank_latest(
-        featured, weights, args.top, args.min_history, args.min_amount
-    )
-    candidates, return_model_summary = add_return_estimates(featured, candidates, target_column="next_return")
+    all_rankings = rank_latest(featured, weights, None, args.min_history, args.min_amount)
+    all_rankings, return_model_summary = add_return_estimates(featured, all_rankings, target_column="next_return")
+    candidates=all_rankings.head(args.top).copy()
     summary = historical_top_summary(
         featured, weights, args.top, args.ic_days, args.min_history, args.min_amount, "next_return"
     )
@@ -317,17 +317,20 @@ def main() -> None:
     candidate_path = output_dir / f"next_day_candidates_{label}.csv"
     factor_path = output_dir / f"factor_report_{label}.csv"
     summary_path = output_dir / f"model_summary_{label}.json"
+    ranking_path = output_dir / f"all_stock_rankings_{label}.csv"
     candidates.to_csv(candidate_path, index=False, encoding="utf-8-sig")
+    all_rankings.to_csv(ranking_path,index=False,encoding="utf-8-sig")
     factor_report.to_csv(factor_path, index=False, encoding="utf-8-sig")
     summary_path.write_text(
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
     trade_weights, trade_factor_report = estimate_factor_weights(featured, args.ic_days, "tradeable_return")
-    trade_candidates = rank_latest(featured, trade_weights, args.top, args.min_history, args.min_amount)
-    trade_candidates, trade_return_summary = add_return_estimates(
-        featured, trade_candidates, target_column="tradeable_return", price_basis=False
+    trade_all_rankings = rank_latest(featured, trade_weights, None, args.min_history, args.min_amount)
+    trade_all_rankings, trade_return_summary = add_return_estimates(
+        featured, trade_all_rankings, target_column="tradeable_return", price_basis=False
     )
+    trade_candidates=trade_all_rankings.head(args.top).copy()
     trade_summary = historical_top_summary(
         featured, trade_weights, args.top, args.ic_days, args.min_history, args.min_amount, "tradeable_return"
     )
@@ -336,7 +339,9 @@ def main() -> None:
     trade_candidate_path = output_dir / f"tradeable_candidates_{label}.csv"
     trade_factor_path = output_dir / f"tradeable_factor_report_{label}.csv"
     trade_summary_path = output_dir / f"tradeable_model_summary_{label}.json"
+    trade_ranking_path = output_dir / f"tradeable_all_stock_rankings_{label}.csv"
     trade_candidates.to_csv(trade_candidate_path, index=False, encoding="utf-8-sig")
+    trade_all_rankings.to_csv(trade_ranking_path,index=False,encoding="utf-8-sig")
     trade_factor_report.to_csv(trade_factor_path, index=False, encoding="utf-8-sig")
     trade_summary_path.write_text(json.dumps(trade_summary, ensure_ascii=False, indent=2), encoding="utf-8")
 

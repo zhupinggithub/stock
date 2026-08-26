@@ -95,7 +95,7 @@ def import_market_data(data_dir: Path, db: Engine | None = None) -> int:
         if batch: conn.execute(sql,batch)
     return len(records)
 
-def import_prediction(candidate_path: Path, factor_path: Path, summary_path: Path, db: Engine | None = None) -> int:
+def import_prediction(candidate_path: Path, factor_path: Path, summary_path: Path, db: Engine | None = None, ranking_path: Path | None = None) -> int:
     db=db or engine(); candidates=pd.read_csv(candidate_path,dtype={"股票代码":str}); factors=pd.read_csv(factor_path); summary=json.loads(summary_path.read_text(encoding="utf-8")); base=str(candidates.iloc[0]["预测基准日"])
     model_code=summary.get("模型代码","multi_factor_rank"); model_version=summary.get("模型版本","1.0.0")
     with db.begin() as conn:
@@ -113,6 +113,17 @@ def import_prediction(candidate_path: Path, factor_path: Path, summary_path: Pat
               ON DUPLICATE KEY UPDATE ranking=VALUES(ranking),score=VALUES(score),base_close=VALUES(base_close),daily_return=VALUES(daily_return),return_5d=VALUES(return_5d),volume_ratio_20=VALUES(volume_ratio_20),avg_amount_20=VALUES(avg_amount_20),volatility_10=VALUES(volatility_10),up_probability=VALUES(up_probability),expected_return=VALUES(expected_return),return_low_90=VALUES(return_low_90),return_high_90=VALUES(return_high_90),target_price=VALUES(target_price),price_low_90=VALUES(price_low_90),price_high_90=VALUES(price_high_90),prediction_confidence=VALUES(prediction_confidence)"""),{"run":run_id,"stock":ids[code],"rank":rank,"score":clean(r["综合评分"]),"close":clean(r["收盘"]),"daily":clean(r["当日涨跌幅"])/100,"r5":clean(r["近5日涨跌幅"])/100,"vr":clean(r["量比20日"]),"amount":clean(r["近20日平均成交额"]),"vol":clean(r["波动率10日"]),"prob":clean(r.get("上涨概率")),"expected":clean(r.get("预计次日收益")),"ret_low":clean(r.get("预计收益下限90")),"ret_high":clean(r.get("预计收益上限90")),"target":clean(r.get("预计目标价格")),"price_low":clean(r.get("预计价格下限90")),"price_high":clean(r.get("预计价格上限90")),"confidence":clean(r.get("预测置信度"))}); cid=conn.execute(text("SELECT id FROM prediction_candidate WHERE prediction_run_id=:run AND stock_id=:stock"),{"run":run_id,"stock":ids[code]}).scalar_one()
             vals=[{"cid":cid,"code":code_,"value":clean(r.get(col))} for col,code_ in FACTOR_COLUMNS.items()]
             conn.execute(text("INSERT INTO candidate_factor(candidate_id,factor_code,percentile) VALUES(:cid,:code,:value) ON DUPLICATE KEY UPDATE percentile=VALUES(percentile)"),vals)
+        if ranking_path and ranking_path.exists():
+            rankings=pd.read_csv(ranking_path,dtype={"股票代码":str});rank_ids=upsert_stocks(rankings.to_dict("records"),conn);total=len(rankings)
+            conn.execute(text("DELETE FROM prediction_stock_rank WHERE prediction_run_id=:run"),{"run":run_id})
+            sql=text("""INSERT INTO prediction_stock_rank(prediction_run_id,stock_id,full_ranking,ranking_percentile,score,base_close,up_probability,expected_return,return_low_90,return_high_90,is_candidate,candidate_ranking,daily_return,return_5d,volume_ratio_20,avg_amount_20,volatility_10,factor_values)
+              VALUES(:run,:stock,:ranking,:percentile,:score,:close,:probability,:expected,:low,:high,:candidate,:candidate_rank,:daily,:return5,:volume_ratio,:amount,:volatility,:factors)""")
+            batch=[]
+            for ranking,(_,r) in enumerate(rankings.iterrows(),1):
+                code=normalize_code(r["股票代码"]);factor_values={code_:clean(r.get(column)) for column,code_ in FACTOR_COLUMNS.items()}
+                batch.append({"run":run_id,"stock":rank_ids[code],"ranking":ranking,"percentile":1-(ranking-1)/max(total,1),"score":clean(r["综合评分"]),"close":clean(r.get("收盘")),"probability":clean(r.get("上涨概率")),"expected":clean(r.get("预计次日收益")),"low":clean(r.get("预计收益下限90")),"high":clean(r.get("预计收益上限90")),"candidate":int(ranking<=len(candidates)),"candidate_rank":ranking if ranking<=len(candidates) else None,"daily":clean(r.get("当日涨跌幅"))/100,"return5":clean(r.get("近5日涨跌幅"))/100,"volume_ratio":clean(r.get("量比20日")),"amount":clean(r.get("近20日平均成交额")),"volatility":clean(r.get("波动率10日")),"factors":json.dumps(factor_values,ensure_ascii=False)})
+                if len(batch)>=1000:conn.execute(sql,batch);batch=[]
+            if batch:conn.execute(sql,batch)
     return len(candidates)
 
 def import_intraday(detail_path: Path, group_path: Path, summary_path: Path, db: Engine | None = None) -> int:
