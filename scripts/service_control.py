@@ -41,7 +41,7 @@ def start()->int:
     kwargs={"cwd":ROOT,"stdout":out,"stderr":err,"stdin":subprocess.DEVNULL,"close_fds":True}
     if os.name=="nt": kwargs["creationflags"]=subprocess.DETACHED_PROCESS|subprocess.CREATE_NEW_PROCESS_GROUP
     else: kwargs["start_new_session"]=True
-    process=subprocess.Popen([sys.executable,"-m","uvicorn","backend.app.main:app","--host",os.getenv("STOCK_APP_HOST","127.0.0.1"),"--port",port],**kwargs)
+    process=subprocess.Popen([sys.executable,"-m","uvicorn","backend.app.main:app","--host",os.getenv("STOCK_APP_HOST","0.0.0.0"),"--port",port],**kwargs)
     PID_FILE.write_text(str(process.pid),encoding="ascii")
     for _ in range(60):
         if process.poll() is not None: PID_FILE.unlink(missing_ok=True);print("Web service failed to start; see .runtime/web.error.log",file=sys.stderr);return 1

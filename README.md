@@ -82,12 +82,13 @@ chmod +x stop_web.sh
 也可以不使用启动脚本，直接启动后端：
 
 ```bash
-python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 9999
+python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 9999
 ```
 
 启动脚本会在后台运行 FastAPI，并把 PID 和日志保存在 `.runtime/`；重复启动不会创建第二个进程。停止脚本只终止 PID 文件记录的服务。后端同时托管已经构建到 `frontend/dist` 的 Vue 生产页面。
 
 - 页面：http://127.0.0.1:9999
+- 局域网：http://本机局域网IP:9999
 - API 文档：http://127.0.0.1:9999/docs
 
 页面中的“任务中心”可以后台执行行情增量采集、预测、正式验证、盘中观察和完整每日流水线，并显示任务进度、日志及失败原因。同一时间只允许一个任务运行，避免重复点击造成并发写入。

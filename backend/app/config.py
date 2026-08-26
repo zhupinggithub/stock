@@ -13,7 +13,7 @@ class Settings:
     db_user: str = os.getenv("STOCK_DB_USER", "root")
     db_password: str = os.getenv("STOCK_DB_PASSWORD", "")
     db_name: str = os.getenv("STOCK_DB_NAME", "stock")
-    app_host: str = os.getenv("STOCK_APP_HOST", "127.0.0.1")
+    app_host: str = os.getenv("STOCK_APP_HOST", "0.0.0.0")
     app_port: int = int(os.getenv("STOCK_APP_PORT", "9999"))
 
 settings = Settings()
