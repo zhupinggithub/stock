@@ -15,5 +15,7 @@ class Settings:
     db_name: str = os.getenv("STOCK_DB_NAME", "stock")
     app_host: str = os.getenv("STOCK_APP_HOST", "0.0.0.0")
     app_port: int = int(os.getenv("STOCK_APP_PORT", "9999"))
+    session_days: int = int(os.getenv("STOCK_SESSION_DAYS", "60"))
+    session_idle_days: int = int(os.getenv("STOCK_SESSION_IDLE_DAYS", "30"))
 
 settings = Settings()

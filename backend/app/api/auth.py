@@ -3,7 +3,7 @@ from fastapi import APIRouter,Depends,HTTPException,Request,Response
 from sqlalchemy import text
 from backend.app.database import engine
 from backend.app.schemas.auth import ChangePasswordBody,LoginBody,RegisterBody,ResetConsumeBody
-from backend.app.services.auth_service import COOKIE_NAME,audit,create_session,create_user,current_auth,hash_password,token_hash,user_access,verify_password
+from backend.app.services.auth_service import COOKIE_NAME,SESSION_MAX_AGE_SECONDS,audit,create_session,create_user,current_auth,hash_password,token_hash,user_access,verify_password
 
 router=APIRouter(prefix="/auth",tags=["auth"])
 
@@ -13,7 +13,7 @@ def register(body:RegisterBody,request:Request,response:Response):
     try:uid=create_user(body.username,body.password,body.display_name,body.email,body.mobile,[role_id],must_change=False)
     except ValueError as exc:raise HTTPException(422,str(exc))
     except Exception as exc:raise HTTPException(409,"用户名、邮箱或手机号已被使用") from exc
-    raw,session=create_session(uid,request);response.set_cookie(COOKIE_NAME,raw,max_age=7*86400,httponly=True,samesite="lax",secure=False,path="/")
+    raw,session=create_session(uid,request);response.set_cookie(COOKIE_NAME,raw,max_age=SESSION_MAX_AGE_SECONDS,httponly=True,samesite="lax",secure=False,path="/")
     access=user_access(uid);audit("auth.register",request,access,True);return {"user":access,"csrf_token":session["csrf_token"]}
 
 @router.post("/login")
@@ -32,7 +32,7 @@ def login(body:LoginBody,request:Request,response:Response):
     if failure_user:
         audit("auth.login",request,failure_user,False,detail={"reason":"invalid_credentials"})
         raise HTTPException(401,"用户名或密码错误，连续失败 5 次将锁定 15 分钟")
-    raw,session=create_session(user["id"],request);response.set_cookie(COOKIE_NAME,raw,max_age=7*86400,httponly=True,samesite="lax",secure=False,path="/")
+    raw,session=create_session(user["id"],request);response.set_cookie(COOKIE_NAME,raw,max_age=SESSION_MAX_AGE_SECONDS,httponly=True,samesite="lax",secure=False,path="/")
     access=user_access(user["id"]);audit("auth.login",request,access,True);return {"user":access,"csrf_token":session["csrf_token"]}
 
 @router.get("/me")

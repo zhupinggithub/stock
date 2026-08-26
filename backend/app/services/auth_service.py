@@ -4,9 +4,10 @@ from datetime import datetime,timedelta
 from typing import Any,Callable
 from fastapi import Depends,HTTPException,Request,status
 from sqlalchemy import text
+from backend.app.config import settings
 from backend.app.database import engine
 
-COOKIE_NAME="stock_session"; SESSION_DAYS=7; IDLE_MINUTES=30
+COOKIE_NAME="stock_session";SESSION_MAX_AGE_SECONDS=settings.session_days*86400
 
 def hash_password(password:str)->str:
     validate_password(password);salt=secrets.token_bytes(16);digest=hashlib.scrypt(password.encode(),salt=salt,n=2**14,r=8,p=1,dklen=32)
@@ -37,7 +38,7 @@ def user_access(user_id:int)->dict:
     value=dict(user);value["roles"]=roles;value["permissions"]=permissions;return value
 
 def create_session(user_id:int,request:Request)->tuple[str,dict]:
-    raw=secrets.token_urlsafe(48);csrf=secrets.token_hex(32);expires=datetime.now()+timedelta(days=SESSION_DAYS)
+    raw=secrets.token_urlsafe(48);csrf=secrets.token_hex(32);expires=datetime.now()+timedelta(days=settings.session_days)
     with engine().begin() as conn:
         result=conn.execute(text("INSERT INTO app_session(user_id,token_hash,csrf_token,expires_at,ip_address,user_agent) VALUES(:uid,:token,:csrf,:expires,:ip,:agent)"),{"uid":user_id,"token":token_hash(raw),"csrf":csrf,"expires":expires,"ip":client_ip(request),"agent":request.headers.get("user-agent","")[:500]})
         session_id=int(result.lastrowid)
@@ -50,7 +51,7 @@ def current_auth(request:Request)->dict:
         session=conn.execute(text("""SELECT s.id,s.user_id,s.csrf_token,s.expires_at,s.last_active_at,u.status,u.must_change_password
           FROM app_session s JOIN app_user u ON u.id=s.user_id WHERE s.token_hash=:token AND s.revoked_at IS NULL"""),{"token":token_hash(raw)}).mappings().first()
         now=datetime.now()
-        if not session or session["expires_at"]<=now or session["last_active_at"]<now-timedelta(minutes=IDLE_MINUTES) or session["status"]!="active":raise HTTPException(status.HTTP_401_UNAUTHORIZED,"登录已失效，请重新登录")
+        if not session or session["expires_at"]<=now or session["last_active_at"]<now-timedelta(days=settings.session_idle_days) or session["status"]!="active":raise HTTPException(status.HTTP_401_UNAUTHORIZED,"登录已失效，请重新登录")
         conn.execute(text("UPDATE app_session SET last_active_at=:now WHERE id=:id"),{"now":now,"id":session["id"]})
     user=user_access(session["user_id"]);user["session_id"]=session["id"];user["csrf_token"]=session["csrf_token"];return user
 
