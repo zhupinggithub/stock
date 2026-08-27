@@ -18,11 +18,12 @@ def stocks(q:str="",market:str="",page:int=Query(1,ge=1),page_size:int=Query(20,
     cte="""WITH ranked AS (SELECT sd.*,ROW_NUMBER() OVER(PARTITION BY stock_id ORDER BY trade_date DESC) rn FROM stock_daily sd),
     metrics AS (SELECT stock_id,COUNT(*) daily_count,MAX(CASE WHEN rn=1 THEN trade_date END) latest_date,
       MAX(CASE WHEN rn=1 THEN close_price END) latest_close,MAX(CASE WHEN rn=1 THEN change_pct END) latest_change_pct,
+      MAX(CASE WHEN rn=1 THEN amount END) latest_amount,
       CASE WHEN MAX(CASE WHEN rn=1 AND change_pct>0 THEN 1 ELSE 0 END)=0 THEN 0 ELSE COALESCE(MIN(CASE WHEN change_pct<=0 THEN rn END)-1,COUNT(*)) END up_streak,
       CASE WHEN MAX(CASE WHEN rn=1 AND change_pct<0 THEN 1 ELSE 0 END)=0 THEN 0 ELSE COALESCE(MIN(CASE WHEN change_pct>=0 THEN rn END)-1,COUNT(*)) END down_streak
       FROM ranked GROUP BY stock_id), universe AS (SELECT sm.stock_code,sm.stock_name,sm.market,sm.is_st,m.* FROM stock_master sm LEFT JOIN metrics m ON m.stock_id=sm.id) """
     total=fetch_all(cte+f"SELECT COUNT(*) total FROM universe WHERE {' AND '.join(where)}",params)[0]["total"]
-    values=fetch_all(cte+f"""SELECT stock_code,stock_name,market,is_st,latest_date,latest_close,latest_change_pct,
+    values=fetch_all(cte+f"""SELECT stock_code,stock_name,market,is_st,latest_date,latest_close,latest_change_pct,latest_amount,
       COALESCE(up_streak,0) up_streak,COALESCE(down_streak,0) down_streak,COALESCE(daily_count,0) daily_count
       FROM universe WHERE {' AND '.join(where)} ORDER BY stock_code LIMIT :limit OFFSET :offset""",params)
     return {"items":values,"page":page,"page_size":page_size,"total":total,"pages":max(1,(total+page_size-1)//page_size)}
