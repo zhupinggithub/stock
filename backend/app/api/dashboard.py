@@ -20,7 +20,13 @@ def dashboard():
           JOIN prediction_run pr ON pr.id=r.prediction_run_id
           WHERE r.id=(SELECT ir.id FROM intraday_run ir JOIN prediction_run p ON p.id=ir.prediction_run_id
             WHERE p.model_code=:code ORDER BY ir.observed_at DESC,ir.id DESC LIMIT 1) ORDER BY g.top_n""",{"code":code})
-        models[code]={"latest_prediction":latest,"latest_intraday_groups":groups}
+        verification=fetch_one("""SELECT vr.id,pr.base_date,vr.actual_trade_date,vr.verified_at
+          FROM verification_run vr JOIN prediction_run pr ON pr.id=vr.prediction_run_id
+          WHERE pr.model_code=:code ORDER BY vr.actual_trade_date DESC,vr.id DESC LIMIT 1""",{"code":code}) or {}
+        verification_groups=fetch_all("""SELECT top_n,verified_count,up_rate,avg_return,market_avg_return,excess_return
+          FROM verification_group_result WHERE verification_run_id=:id ORDER BY top_n""",{"id":verification.get("id",0)})
+        models[code]={"latest_prediction":latest,"latest_intraday_groups":groups,
+          "latest_verification":verification,"latest_verification_groups":verification_groups}
     market=fetch_all("""SELECT trade_date,AVG(change_pct)/100 avg_return,AVG(change_pct>0) up_rate
       FROM stock_daily GROUP BY trade_date ORDER BY trade_date DESC LIMIT 20""")[::-1]
     return {"stats":stats,"models":models,"market_history":market}
