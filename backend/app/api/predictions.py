@@ -60,27 +60,16 @@ def candidates(run_id:int):
     for value in full_history:ranks_by_run[value["prediction_run_id"]][value["stock_id"]]=value["full_ranking"]
     previous_id=run_ids[1] if len(run_ids)>1 else None
     for row in data:
-        row["model_code"]=run["model_code"];stock=row["stock_id"];appearances=[stock in candidates_by_run[value] for value in run_ids];streak=0
-        for appeared in appearances:
-            if not appeared:break
-            streak+=1
+        row["model_code"]=run["model_code"];stock=row["stock_id"];appearances=[stock in candidates_by_run[value] for value in run_ids]
         previous=candidates_by_run.get(previous_id,{}).get(stock) if previous_id else None
-        row.update({"consecutive_count":streak,"recent_5_count":sum(appearances[:5]),"recent_5_periods":min(5,len(appearances)),"recent_10_count":sum(appearances),"recent_10_periods":len(appearances),"previous_ranking":previous["ranking"] if previous else None,"ranking_change":previous["ranking"]-row["ranking"] if previous else None,"previous_probability":previous["up_probability"] if previous else None,"probability_change":row["up_probability"]-previous["up_probability"] if previous and row["up_probability"] is not None and previous["up_probability"] is not None else None})
+        row.update({"recent_5_count":sum(appearances[:5]),"recent_5_periods":min(5,len(appearances)),"recent_10_count":sum(appearances),"recent_10_periods":len(appearances),"previous_ranking":previous["ranking"] if previous else None,"ranking_change":previous["ranking"]-row["ranking"] if previous else None,"previous_probability":previous["up_probability"] if previous else None,"probability_change":row["up_probability"]-previous["up_probability"] if previous and row["up_probability"] is not None and previous["up_probability"] is not None else None})
         rank_values=[ranks_by_run[value][stock] for value in run_ids if stock in ranks_by_run[value]]
         current_full=ranks_by_run.get(run_id,{}).get(stock);previous_full=ranks_by_run.get(previous_id,{}).get(stock) if previous_id else None
-        top50=top100=0
-        for value in run_ids:
-            rank=ranks_by_run[value].get(stock)
-            if rank is not None and rank<=50:top50+=1
-            else:break
-        for value in run_ids:
-            rank=ranks_by_run[value].get(stock)
-            if rank is not None and rank<=100:top100+=1
-            else:break
-        row.update({"full_ranking":current_full,"previous_full_ranking":previous_full,"full_ranking_change":previous_full-current_full if current_full and previous_full else None,"consecutive_top_50":top50,"consecutive_top_100":top100,"ranking_trend":_trend(current_full,previous_full,rank_values[:3]) if current_full else None})
+        row.update({"full_ranking":current_full,"previous_full_ranking":previous_full,"full_ranking_change":previous_full-current_full if current_full and previous_full else None,"ranking_trend":_trend(current_full,previous_full,rank_values[:3]) if current_full else None})
     factors=fetch_all("""SELECT factor_code,factor_name,mean_ic,positive_ic_rate,valid_trade_days,model_weight
       FROM prediction_factor WHERE prediction_run_id=:id ORDER BY ABS(model_weight) DESC""",{"id":run_id})
-    return {"candidates":data,"factors":factors,"has_full_ranking":bool(full_history)}
+    full_run_count=len({value["prediction_run_id"] for value in full_history})
+    return {"candidates":data,"factors":factors,"has_full_ranking":bool(full_history),"has_full_ranking_history":full_run_count>=2,"full_ranking_periods":full_run_count}
 
 @router.get("/{run_id}/rankings")
 def rankings(run_id:int,page:int=Query(1,ge=1),page_size:int=Query(50,ge=10,le=200),keyword:str="",market:str="",rank_min:int|None=None,rank_max:int|None=None,probability_min:float|None=None,candidate_only:bool=False,sort:str="full_ranking",order:str="asc"):
