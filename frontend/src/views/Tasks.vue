@@ -10,6 +10,7 @@ const today=new Date().toLocaleDateString('en-CA'),jobs=ref([]),selected=ref(),m
 const dataDir=ref('data'),source=ref('sina'),top=ref(30),tradeDate=ref(today);
 const schedule=ref({enabled:false,run_time:'15:20',weekdays:[1,2,3,4,5],data_dir:'data',data_source:'sina',top_n:30}),scheduleMessage=ref('');
 const dayNames={1:'周一',2:'周二',3:'周三',4:'周四',5:'周五',6:'周六',7:'周日'};
+const statusNames={pending:'等待中',running:'执行中',success:'成功',failed:'失败'},triggerNames={manual:'手动',schedule:'定时'};
 async function refresh(){jobs.value=await get('/tasks?limit=30');if(selected.value)selected.value=await get(`/tasks/${selected.value.id}`);const active=jobs.value.some(x=>['pending','running'].includes(x.status));if(active&&!timer.value)timer.value=setInterval(refresh,2000);if(!active&&timer.value){clearInterval(timer.value);timer.value=null}}
 async function loadSchedule(){schedule.value=await get('/tasks/schedule');schedule.value.weekdays=String(schedule.value.weekdays).split(',').map(Number);schedule.value.run_time=String(schedule.value.run_time).slice(0,5)}
 function toggleDay(day){schedule.value.weekdays=schedule.value.weekdays.includes(day)?schedule.value.weekdays.filter(x=>x!==day):[...schedule.value.weekdays,day].sort()}
@@ -17,7 +18,8 @@ async function saveSchedule(){scheduleMessage.value='';if(!schedule.value.weekda
 async function submit(job_type){message.value='';try{const body=await post('/tasks',{job_type,data_dir:dataDir.value,source:source.value,top:Number(top.value),trade_date:job_type==='collect'?tradeDate.value:null});message.value=`任务 #${body.id} 已提交`;await refresh()}catch(e){message.value=e.message}}
 async function show(row){selected.value=selected.value?.id===row.id?null:await get(`/tasks/${row.id}`)}
 function onKey(event){if(event.key==='Escape'&&selected.value)selected.value=null}
-const columns=[{label:'任务ID',key:'id',format:v=>`#${v}`,action:show},{label:'任务',key:'job_type',format:v=>labels[v]||v},{label:'状态',key:'status'},{label:'进度',key:'progress',format:v=>`${v}%`},{label:'触发方式',key:'trigger_type'},{label:'创建人',key:'created_by_username',format:v=>v||'系统'},{label:'创建时间',key:'created_at'},{label:'结束时间',key:'finished_at'}];
+function duration(row){if(!row.started_at)return'—';const end=row.finished_at?new Date(row.finished_at):new Date(),seconds=Math.max(0,Math.round((end-new Date(row.started_at))/1000));return seconds<60?`${seconds}秒`:`${Math.floor(seconds/60)}分${seconds%60}秒`}
+const columns=[{label:'任务ID',key:'id',format:v=>`#${v}`,action:show,defaultDirection:-1},{label:'任务',key:'job_type',format:v=>labels[v]||v},{label:'状态',key:'status',format:v=>statusNames[v]||v},{label:'进度',key:'progress',format:(v,r)=>r.status==='running'||r.status==='pending'?`${v}%`:'—'},{label:'触发方式',key:'trigger_type',format:v=>triggerNames[v]||v},{label:'创建人',key:'created_by_username',format:v=>v||'系统'},{label:'创建时间',key:'created_at',defaultDirection:-1},{label:'耗时',key:'duration',format:(v,r)=>duration(r),sortable:false}];
 onMounted(()=>{window.addEventListener('keydown',onKey);return Promise.all([refresh(),can('schedule:view')?loadSchedule():Promise.resolve()])});onUnmounted(()=>{window.removeEventListener('keydown',onKey);if(timer.value)clearInterval(timer.value)});
 </script>
 <template>
@@ -31,6 +33,6 @@ onMounted(()=>{window.addEventListener('keydown',onKey);return Promise.all([refr
     <div class="task-config"><label>数据目录<input v-model="dataDir"></label><label>行情来源<select v-model="source"><option value="sina">新浪</option><option value="eastmoney">东方财富</option><option value="auto">自动切换</option></select></label><label>候选数量<input v-model.number="top" type="number" min="1" max="500"></label><label>收盘行情日期<input v-model="tradeDate" type="date" :max="today"><small>历史日期可用于补拉。</small></label></div>
     <div class="task-actions"><article v-for="(label,key) in labels" v-show="can(taskPermissions[key])" :key="key"><div><h3>{{label}}</h3></div><p>{{help[key]}}</p><button @click="submit(key)">执行{{label}}</button></article></div><p v-if="message" class="notice">{{message}}</p>
   </div>
-  <div class="section"><div class="section-heading"><h2>最近任务</h2><span>点击任务 ID 查看执行详情</span></div><DataTable :columns="columns" :rows="jobs"/></div>
+  <div class="section"><div class="section-heading"><h2>最近任务</h2><span>默认按创建顺序展示 · 点击任务 ID 查看执行详情</span></div><DataTable :columns="columns" :rows="jobs" default-sort="id" :default-direction="-1"/></div>
   <Teleport to="body"><div v-if="selected" class="modal-backdrop" @click.self="selected=null"><section class="task-detail-modal stock-modal card" role="dialog" aria-modal="true" :aria-label="`任务 ${selected.id} 执行详情`"><div class="detail-heading"><div><h2>任务 #{{selected.id}} · {{labels[selected.job_type]}}</h2><span class="modal-caption">{{selected.trigger_type||'manual'}} · {{selected.created_by_username||'系统'}}</span></div><button @click="selected=null">关闭</button></div><div class="progress"><i :style="{width:`${selected.progress}%`}"></i></div><p>状态：<b>{{selected.status}}</b>　进度：{{selected.progress}}%</p><p v-if="selected.error_message" class="negative">{{selected.error_message}}</p><pre>{{selected.log_text||'等待日志…'}}</pre></section></div></Teleport>
 </template>
