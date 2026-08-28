@@ -235,6 +235,20 @@ CREATE TABLE IF NOT EXISTS password_reset_token (
   CONSTRAINT fk_reset_user FOREIGN KEY(user_id) REFERENCES app_user(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS actual_position (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL, stock_id BIGINT UNSIGNED NOT NULL,
+  source_candidate_id BIGINT UNSIGNED NULL,
+  buy_date DATE NOT NULL, buy_price DECIMAL(12,4) NOT NULL, quantity DECIMAL(18,4) NOT NULL,
+  status ENUM('open','closed') NOT NULL DEFAULT 'open',
+  sell_date DATE NULL, sell_price DECIMAL(12,4) NULL, note VARCHAR(500) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY(id), KEY idx_position_user_status(user_id,status), KEY idx_position_stock(stock_id),
+  CONSTRAINT fk_position_user FOREIGN KEY(user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+  CONSTRAINT fk_position_stock FOREIGN KEY(stock_id) REFERENCES stock_master(id),
+  CONSTRAINT fk_position_candidate FOREIGN KEY(source_candidate_id) REFERENCES prediction_candidate(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS audit_log (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, user_id BIGINT UNSIGNED NULL,
   username VARCHAR(50) NULL, action VARCHAR(100) NOT NULL, resource_type VARCHAR(50) NULL,
