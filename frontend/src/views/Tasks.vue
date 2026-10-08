@@ -6,6 +6,7 @@ const props=defineProps({user:{type:Object,required:true}}),can=p=>props.user.pe
 const taskPermissions={collect:'task:collect',predict:'task:predict',verify:'task:verify',intraday:'task:intraday',pipeline:'task:pipeline'};
 const labels={collect:'拉取收盘增量',predict:'执行预测',verify:'执行正式验证',intraday:'获取盘中观察',pipeline:'完整每日流水线'};
 const help={collect:'拉取指定交易日行情并同步数据库，唯一键保证重复拉取不会产生重复记录。',predict:'根据最新日线生成两个模型的候选；同一基准日重复执行会更新结果。',verify:'用已入库的后续行情验证历史预测；行情不足时保持等待验证。',intraday:'获取一次实时快照，不修改历史日线、正式预测或验证结果。',pipeline:'依次完成收盘增量、验证上一期并生成两个模型的下一期预测。'};
+taskPermissions.limit_up='task:predict';labels.limit_up='涨停概率预测';help.limit_up='独立训练主板非ST次日触板/封板模型并生成滚动回测，不修改现有T+1模型。';
 const today=new Date().toLocaleDateString('en-CA'),jobs=ref([]),selected=ref(),message=ref(''),timer=ref();
 const dataDir=ref('data'),source=ref('sina'),top=ref(30),tradeDate=ref(today);
 const schedule=ref({enabled:false,run_time:'15:20',weekdays:[1,2,3,4,5],data_dir:'data',data_source:'sina',top_n:30}),scheduleMessage=ref('');

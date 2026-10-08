@@ -33,12 +33,13 @@ def _commands(kind:str,data_dir:Path,source:str,top:int,trade_date:date|None=Non
     commands={
       "collect":[collect],
       "predict":[[py,"scripts/stock_predictor.py","--data-dir",relative,"--top",str(top)]],
+      "limit_up":[[py,"scripts/limit_up_predictor.py","--data-dir",relative,"--top",str(top)]],
       "verify":[[py,"scripts/verify_predictions.py","--data-dir",relative]],
       "intraday":[[py,"scripts/monitor_predictions_intraday.py","--data-dir",relative,"--source",source]],
       "pipeline":[[py,"scripts/stock_pipeline.py","--data-dir",relative,"--source",source,"--top",str(top)]],
     }
     result=commands[kind]
-    if kind!="pipeline": result.append([py,"scripts/import_existing_csv.py","--data-dir",relative])
+    if kind not in ("pipeline","limit_up"): result.append([py,"scripts/import_existing_csv.py","--data-dir",relative])
     return result
 
 def submit_job(kind:str,data_dir:str,source:str,top:int,trade_date:date|None=None,created_by:int|None=None,trigger_type:str="manual")->int:

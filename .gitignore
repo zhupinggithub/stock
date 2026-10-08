@@ -28,3 +28,5 @@ data/predictions/all_stock_rankings_*.csv
 data/predictions/tradeable_all_stock_rankings_*.csv
 data/predictions/intraday/
 data/predictions/verification/
+data/
+data_backup_20260831/

@@ -40,6 +40,7 @@ def init_schema(db: Engine | None = None) -> None:
         for column,column_type in additions.items():
             if column not in existing: conn.execute(text(f"ALTER TABLE prediction_candidate ADD COLUMN {column} {column_type} NULL"))
         job_columns={row[0] for row in conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='system_job'"))}
+        conn.execute(text("ALTER TABLE system_job MODIFY job_type ENUM('collect','predict','limit_up','verify','intraday','pipeline') NOT NULL"))
         if "created_by" not in job_columns: conn.execute(text("ALTER TABLE system_job ADD COLUMN created_by BIGINT UNSIGNED NULL"))
         if "trigger_type" not in job_columns: conn.execute(text("ALTER TABLE system_job ADD COLUMN trigger_type ENUM('manual','schedule','system') NOT NULL DEFAULT 'manual'"))
         conn.execute(text("ALTER TABLE app_user MODIFY must_change_password TINYINT(1) NOT NULL DEFAULT 0"))
@@ -83,7 +84,9 @@ def import_market_data(data_dir: Path, db: Engine | None = None) -> int:
     frame = pd.concat(frames, ignore_index=True).drop_duplicates(["股票代码", "日期"], keep="last")
     records = frame.to_dict("records")
     with db.begin() as conn:
-        ids = upsert_stocks(records, conn)
+        ids = upsert_stocks(frame.drop_duplicates("股票代码", keep="last").to_dict("records"), conn)
+    # Commit batches to release locks during historical imports.
+    with db.connect() as conn:
         sql = text("""INSERT INTO stock_daily(stock_id,trade_date,open_price,close_price,high_price,low_price,volume,amount,amplitude_pct,change_pct,change_amount,turnover_pct,data_source)
           VALUES(:stock_id,:date,:open,:close,:high,:low,:volume,:amount,:amplitude,:change_pct,:change_amount,:turnover,'file')
           ON DUPLICATE KEY UPDATE open_price=VALUES(open_price),close_price=VALUES(close_price),high_price=VALUES(high_price),low_price=VALUES(low_price),volume=VALUES(volume),amount=VALUES(amount),amplitude_pct=VALUES(amplitude_pct),change_pct=VALUES(change_pct),change_amount=VALUES(change_amount),turnover_pct=VALUES(turnover_pct),updated_at=CURRENT_TIMESTAMP""")
@@ -91,8 +94,11 @@ def import_market_data(data_dir: Path, db: Engine | None = None) -> int:
         for r in records:
             code=normalize_code(r["股票代码"])
             batch.append({"stock_id":ids[code],"date":r["日期"],"open":clean(r.get("开盘")),"close":clean(r.get("收盘")),"high":clean(r.get("最高")),"low":clean(r.get("最低")),"volume":clean(r.get("成交量")),"amount":clean(r.get("成交额")),"amplitude":clean(r.get("振幅")),"change_pct":clean(r.get("涨跌幅")),"change_amount":clean(r.get("涨跌额")),"turnover":clean(r.get("换手率"))})
-            if len(batch)>=2000: conn.execute(sql,batch); batch=[]
-        if batch: conn.execute(sql,batch)
+            if len(batch)>=2000:
+                with conn.begin(): conn.execute(sql,batch)
+                batch=[]
+        if batch:
+            with conn.begin(): conn.execute(sql,batch)
     return len(records)
 
 def import_prediction(candidate_path: Path, factor_path: Path, summary_path: Path, db: Engine | None = None, ranking_path: Path | None = None) -> int:

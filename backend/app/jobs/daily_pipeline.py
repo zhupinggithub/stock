@@ -28,6 +28,7 @@ def main() -> None:
     print(f"MySQL同步日线：{import_market_data(args.data_dir,db)} 行")
     run("scripts/verify_predictions.py","--data-dir",str(args.data_dir))
     run("scripts/stock_predictor.py","--data-dir",str(args.data_dir),"--top",str(args.top))
+    run("scripts/limit_up_predictor.py","--data-dir",str(args.data_dir),"--top",str(min(args.top,20)))
     pred=args.data_dir/"predictions"; candidates=sorted(pred.glob("next_day_candidates_*.csv"))[-1]; label=candidates.stem.rsplit("_",1)[-1]
     count=import_prediction(candidates,pred/f"factor_report_{label}.csv",pred/f"model_summary_{label}.json",db,pred/f"all_stock_rankings_{label}.csv")
     trade_candidates=pred/f"tradeable_candidates_{label}.csv"

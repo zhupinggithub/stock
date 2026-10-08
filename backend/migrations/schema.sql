@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS verification_group_result (
 
 CREATE TABLE IF NOT EXISTS system_job (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  job_type ENUM('collect','predict','verify','intraday','pipeline') NOT NULL,
+  job_type ENUM('collect','predict','limit_up','verify','intraday','pipeline') NOT NULL,
   status ENUM('pending','running','success','failed') NOT NULL DEFAULT 'pending',
   progress INT NOT NULL DEFAULT 0,
   parameters JSON NULL,

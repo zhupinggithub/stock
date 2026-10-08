@@ -31,7 +31,7 @@ def detail(job_id:int,_:dict=Depends(require_permission("task:view"))):
 
 @router.post("",status_code=202)
 def create(body:JobCreate,request:Request,user:dict=Depends(require_permission("task:view"))):
-    permission={"collect":"task:collect","predict":"task:predict","verify":"task:verify","intraday":"task:intraday","pipeline":"task:pipeline"}[body.job_type]
+    permission={"collect":"task:collect","predict":"task:predict","limit_up":"task:predict","verify":"task:verify","intraday":"task:intraday","pipeline":"task:pipeline"}[body.job_type]
     if permission not in user["permissions"]:raise HTTPException(403,"没有执行该任务的权限")
     try: job_id=submit_job(body.job_type,body.data_dir,body.source,body.top,body.trade_date,user["id"],"manual")
     except (ValueError,RuntimeError) as exc: raise HTTPException(409,str(exc)) from exc
